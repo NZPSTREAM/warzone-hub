@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NATOwv Warzone Squad Hub</title>
+  
+  <!-- PWA / Standalone Window Configuration -->
+  <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIk5BVE93diBXYXJ6b25lIFNxdWFkIEh1YiIsCiAgInNob3J0X25hbWUiOiAiTkFUT3d2IEh1YiIsCiAgInN0YXJ0X3VybCI6ICIuIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAiYmFja2dyb3VuZF9jb2xvciI6ICIjMDlhMGUxMCIsCiAgInRoZW1lX2NvbG9yIjogIiMxMTEzMTYiCn0=">
+  <meta name="theme-color" content="#111316">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { background-color: #090e10; color: #f1f5f9; font-family: system-ui, -apple-system, sans-serif; user-select: none; }
+    .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #ff3b30; border-radius: 2px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .bo7-panel { background: rgba(15, 23, 30, 0.92); border: 1px solid rgba(255, 59, 48, 0.25); box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+    .bo7-glow { text-shadow: 0 0 10px rgba(255, 59, 48, 0.5); }
+  </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col justify-between">
+
+  <!-- BO7 TACTICAL TITLEBAR -->
+  <header class="bg-[#111316] border-b border-[#ff3b30]/30 px-3 py-2 flex justify-between items-center z-50 text-slate-300 text-xs">
+    <div class="flex items-center space-x-2">
+      <div class="bg-red-600 text-white font-black px-2 py-0.5 rounded text-[10px] tracking-widest uppercase">NATOwv // BO7</div>
+      <span class="font-semibold text-slate-200">Warzone Viewer & Squad Portal</span>
+    </div>
+    <div class="flex items-center space-x-4">
+      <span id="session-status" class="px-2 py-0.5 rounded bg-red-950/60 text-red-400 border border-red-500/40 text-[10px] font-mono">STATUS: UNVERIFIED</span>
+      <div class="flex items-center space-x-2 text-slate-500">
+        <i class="fa-solid fa-minus hover:text-slate-300 cursor-pointer"></i>
+        <i class="fa-regular fa-square hover:text-slate-300 cursor-pointer"></i>
+        <i class="fa-solid fa-xmark hover:text-red-400 cursor-pointer"></i>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER -->
+  <main class="flex-1 relative flex items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-[#090e10] to-black">
+
+    <!-- STEP 1: ACTIVISION SSO LOGIN -->
+    <div id="screen-auth-select" class="w-full max-w-md p-6 bo7-panel rounded-lg">
+      <div class="text-center mb-6">
+        <div class="inline-flex p-3 rounded bg-red-600/10 text-red-500 mb-2 border border-red-500/30">
+          <i class="fa-solid fa-shield-halved text-2xl"></i>
+        </div>
+        <h2 class="text-2xl font-black text-white uppercase tracking-wider bo7-glow">Activision Authentication</h2>
+        <p class="text-xs text-slate-400 mt-1">Authenticate your player profile to initialize squad telemetry.</p>
+      </div>
+
+      <div class="space-y-4">
+        <button onclick="launchActivisionAuth()" class="w-full py-3.5 px-4 rounded bg-red-600 hover:bg-red-500 text-white font-black uppercase tracking-wider flex items-center justify-between transition shadow-lg cursor-pointer">
+          <span class="flex items-center gap-3"><i class="fa-solid fa-right-to-bracket text-lg"></i> Login with Activision</span>
+          <i class="fa-solid fa-external-link text-xs"></i>
+        </button>
+
+        <div class="bg-red-950/30 border border-red-500/20 p-3 rounded text-[11px] text-red-300 space-y-1">
+          <p class="font-bold uppercase tracking-wider"><i class="fa-solid fa-triangle-exclamation"></i> Instructions:</p>
+          <p>Clicking login opens the Activision portal. Once signed in, <strong>close the popup window/tab</strong> and this portal will automatically advance.</p>
+        </div>
+
+        <p id="auth-hint" class="text-[11px] text-slate-500 text-center font-mono">Listening for popup closure...</p>
+      </div>
+    </div>
+
+    <!-- STEP 2: RECAPTCHA CHECKPOINT -->
+    <div id="screen-captcha" class="hidden w-full max-w-md p-6 bo7-panel rounded-lg">
+      <div class="text-center mb-6">
+        <div class="inline-flex p-3 rounded bg-amber-500/10 text-amber-400 mb-2 border border-amber-500/30">
+          <i class="fa-solid fa-user-shield text-2xl"></i>
+        </div>
+        <h2 class="text-xl font-black text-white uppercase tracking-wider">Security Checkpoint</h2>
+        <p class="text-xs text-slate-400">Activision SSO confirmed. Complete anti-bot handshake.</p>
+      </div>
+
+      <div class="bg-black/60 border border-slate-800 rounded p-4 mb-6 flex items-center justify-between">
+        <label class="flex items-center gap-3 cursor-pointer select-none">
+          <input type="checkbox" id="captcha-check" onchange="toggleCaptcha(this.checked)" class="w-5 h-5 rounded border-slate-700 text-red-600 focus:ring-0">
+          <span class="text-sm text-slate-200 font-medium">I am not a bot</span>
+        </label>
+        <div class="text-right text-[9px] text-slate-500 uppercase tracking-widest font-mono">reCAPTCHA v3</div>
+      </div>
+
+      <button id="continue-captcha-btn" disabled onclick="goToCodeGate()" class="w-full py-3 rounded bg-red-600 text-white font-bold uppercase tracking-wider opacity-50 cursor-not-allowed transition">
+        Proceed to Access Gate
+      </button>
+    </div>
+
+    <!-- STEP 3: 7-DIGIT STREAM CODE GATE -->
+    <div id="screen-code-gate" class="hidden w-full max-w-md p-6 bo7-panel rounded-lg">
+      <div class="text-center mb-4">
+        <div class="inline-flex p-3 rounded bg-amber-500/10 text-amber-400 mb-2 border border-amber-500/30">
+          <i class="fa-solid fa-key text-2xl"></i>
+        </div>
+        <h2 class="text-xl font-black text-white uppercase tracking-wider">Stream Code Access Gate</h2>
+        <p class="text-xs text-slate-400 mt-1">Enter your 7-digit live stream code OR bypass to enter the public viewer lobby.</p>
+      </div>
+
+      <div class="space-y-4 my-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">7-Digit Stream Code</label>
+          <input type="text" id="stream-code-input" maxlength="7" placeholder="e.g. 7492018" class="w-full text-center tracking-widest text-lg font-mono px-3 py-3 rounded bg-black/80 border border-slate-800 text-amber-400 focus:outline-none focus:border-red-500">
+          <p id="code-error" class="text-xs text-red-400 mt-1 hidden text-center font-medium">Invalid code format or incorrect active code.</p>
+        </div>
+
+        <button onclick="verifyStreamCode()" class="w-full py-3 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-black uppercase tracking-wider transition shadow-lg cursor-pointer">
+          Verify Stream Code
+        </button>
+
+        <div class="relative flex py-2 items-center">
+          <div class="flex-grow border-t border-slate-800"></div>
+          <span class="flex-shrink mx-4 text-[10px] text-slate-500 uppercase tracking-widest">OR</span>
+          <div class="flex-grow border-t border-slate-800"></div>
+        </div>
+
+        <!-- BYPASS BUTTON TO CLAN SETUP -->
+        <button onclick="bypassStreamCode()" class="w-full py-3 px-4 rounded bg-red-950/40 hover:bg-red-900/50 text-red-300 border border-red-500/30 text-xs font-bold uppercase tracking-wider flex items-center justify-between transition cursor-pointer">
+          <span class="flex items-center gap-2">
+            <i class="fa-solid fa-forward text-red-400 text-sm"></i>
+            Bypass Code (Join Viewer Lobby)
+          </span>
+          <i class="fa-solid fa-chevron-right text-xs"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- STEP 4: CLAN SETUP -->
+    <div id="screen-clan-setup" class="hidden w-full max-w-lg p-6 bo7-panel rounded-lg">
+      <h2 class="text-xl font-black text-white uppercase tracking-wider mb-1">Squad Profile Configuration</h2>
+      <p class="text-xs text-slate-400 mb-6">Select your verified roster tag and input your tactical callsign.</p>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Select Clan Roster Tag</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button type="button" onclick="selectTag('[YT]', 'YouTube Main Roster')" id="tag-yt" class="tag-btn py-2.5 px-3 rounded border border-slate-700 bg-slate-900 hover:bg-slate-800 text-sm font-black text-center transition cursor-pointer">[YT]</button>
+            <button type="button" onclick="selectTag('[RecYT]', 'Recruitment Roster')" id="tag-rec" class="tag-btn py-2.5 px-3 rounded border border-slate-700 bg-slate-900 hover:bg-slate-800 text-sm font-black text-center transition cursor-pointer">[RecYT]</button>
+            <button type="button" onclick="selectTag('[LivYT]', 'Live Stream Roster')" id="tag-liv" class="tag-btn py-2.5 px-3 rounded border border-slate-700 bg-slate-900 hover:bg-slate-800 text-sm font-black text-center transition cursor-pointer">[LivYT]</button>
+          </div>
+          <p id="tag-tooltip" class="text-xs text-red-400 mt-2 h-4 font-semibold"></p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Gamer Tag / Activision ID</label>
+          <input type="text" id="gamer-tag-input" placeholder="e.g. Player#1234567" class="w-full px-3 py-2.5 rounded bg-black/80 border border-slate-800 text-sm text-slate-100 focus:outline-none focus:border-red-500">
+          <p class="text-[11px] text-slate-500 mt-1">Leave empty for auto-generated handle: <span class="text-slate-400 font-mono">[Tag]_PlayerXX</span></p>
+        </div>
+
+        <button onclick="enterDiscordHub()" class="w-full mt-2 py-3 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-wider transition cursor-pointer">
+          Connect to Live Lobby
+        </button>
+      </div>
+    </div>
+
+    <!-- STEP 5: STREAMER & VIEWER LIVE CHAT + HOST DASHBOARD -->
+    <div id="screen-discord-hub" class="hidden absolute inset-0 flex bg-[#0e1215] text-slate-200">
+      
+      <!-- LEFT SIDEBAR -->
+      <div class="w-56 bg-[#111418] flex flex-col justify-between border-r border-slate-800/60">
+        <div>
+          <div class="p-4 font-black text-white border-b border-slate-800/60 text-sm tracking-wider flex items-center justify-between">
+            <span>NATOwv Live</span>
+            <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+          </div>
+
+          <!-- STANDARD CHAT NAV -->
+          <div id="viewer-nav-sidebar" class="p-3 space-y-1 text-xs font-semibold text-slate-300">
+            <div class="px-3 py-2 rounded bg-red-950/40 text-red-300 border border-red-500/20 flex items-center gap-2"><i class="fa-solid fa-hashtag text-red-500"></i> live-chat</div>
+          </div>
+
+          <!-- HOST DASHBOARD (TRIGGERS FOR NATOwv-warzone) -->
+          <div id="host-nav-sidebar" class="hidden p-3 space-y-3 text-xs font-semibold text-slate-300">
+            <div class="text-[10px] font-black text-amber-400 uppercase tracking-widest px-1"><i class="fa-solid fa-crown"></i> Host Control Panel</div>
+            
+            <div class="space-y-2 bg-black/40 p-2.5 rounded border border-slate-800">
+              <div>
+                <label class="text-[9px] text-slate-400 uppercase font-bold">Active Stream Code</label>
+                <div class="flex gap-1 mt-1">
+                  <input type="text" id="host-set-code" maxlength="7" value="7492018" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-amber-400 font-mono text-center">
+                  <button onclick="updateStreamCode()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 px-2 py-1 rounded font-bold text-[10px]">Set</button>
+                </div>
+              </div>
+
+              <div>
+                <label class="text-[9px] text-slate-400 uppercase font-bold">Host Username</label>
+                <input type="text" id="host-set-username" value="NATOwv-warzone" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-red-400 font-mono mt-1" readonly>
+              </div>
+            </div>
+
+            <div class="space-y-1.5 pt-1">
+              <label class="text-[9px] text-slate-400 uppercase font-bold px-1">Settings & Toggles</label>
+              <div class="flex items-center justify-between bg-slate-900/80 px-2.5 py-1.5 rounded">
+                <span class="text-[11px] text-slate-300">Public Chat</span>
+                <input type="checkbox" id="toggle-chat" checked onchange="toggleSetting('chat', this.checked)" class="w-4 h-4 accent-red-600 cursor-pointer">
+              </div>
+              <div class="flex items-center justify-between bg-slate-900/80 px-2.5 py-1.5 rounded">
+                <span class="text-[11px] text-slate-300">Lock Squad Queue</span>
+                <input type="checkbox" id="toggle-queue" onchange="toggleSetting('queue', this.checked)" class="w-4 h-4 accent-red-600 cursor-pointer">
+              </div>
+              <button onclick="hostAction('clear')" class="w-full text-left px-2 py-1.5 rounded bg-red-950/60 text-red-300 hover:bg-red-900/60 transition"><i class="fa-solid fa-trash-can mr-1"></i> Clear Chat Feed</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- CURRENT USER FOOTER -->
+        <div class="p-2.5 bg-[#090b0d] flex items-center justify-between border-t border-slate-800/60">
+          <div class="flex items-center gap-2 truncate">
+            <div id="user-avatar-badge" class="w-7 h-7 rounded bg-red-600 flex items-center justify-center font-black text-xs text-white">YT</div>
+            <div class="truncate">
+              <div class="text-xs font-bold text-white truncate" id="hub-username-display">User</div>
+              <div class="text-[9px] text-red-400 font-mono font-bold" id="hub-tag-display">[YT]</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MAIN REAL-TIME CHAT FEED -->
+      <div class="flex-1 flex flex-col justify-between bg-[#0e1215]">
+        <div class="p-3.5 border-b border-slate-800/60 font-bold text-white flex justify-between items-center text-sm">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-hashtag text-slate-400"></i>
+            <span id="chat-header-title">live-chat (Chat with NATOwv & Viewers)</span>
+          </div>
+          <span class="text-xs text-emerald-400 flex items-center gap-1.5 font-normal"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Connected</span>
+        </div>
+
+        <div id="chat-feed" class="flex-1 p-4 overflow-y-auto space-y-3 custom-scrollbar">
+          <div class="text-xs text-slate-400 bg-slate-900/60 p-3 rounded border border-slate-800">
+            <strong>Welcome to the live stream chat!</strong> Type your message below to talk directly with NATOwv and other real viewers in real-time.
+          </div>
+        </div>
+
+        <div class="p-4 bg-[#0e1215]">
+          <div id="chat-input-wrapper" class="bg-[#15191e] border border-slate-800 rounded px-4 py-2.5 flex items-center gap-3">
+            <input type="text" id="chat-input" onkeypress="if(event.key==='Enter') sendChatMessage()" placeholder="Send a message to live-chat..." class="bg-transparent flex-1 text-sm text-slate-100 focus:outline-none">
+            <button onclick="sendChatMessage()" class="text-red-500 hover:text-red-400 text-xs font-black uppercase tracking-wider cursor-pointer">Send</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT SIDEBAR: WHO'S WAITING TO GAME (WITH KICK/BAN FOR HOST) -->
+      <div class="w-64 bg-[#111418] p-3 border-l border-slate-800/60 overflow-y-auto custom-scrollbar flex flex-col justify-between">
+        <div>
+          <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center justify-between">
+            <span>🎮 Waiting to Game</span>
+            <span id="member-count" class="text-red-400 font-mono">1</span>
+          </div>
+          <p class="text-[10px] text-slate-500 mb-3 leading-tight">Real players & viewers currently online and ready to squad up.</p>
+          <div id="member-list" class="space-y-1.5"></div>
+        </div>
+
+        <div class="bg-red-950/20 border border-red-500/30 p-2.5 rounded text-center">
+          <p class="text-[10px] text-red-300 font-bold">Want to play in the next lobby?</p>
+          <p class="text-[9px] text-slate-400 mt-0.5">Drop your Activision ID in chat so NATOwv can invite you!</p>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <script>
+    let state = {
+      currentStep: 'auth-select',
+      authPopup: null,
+      popupTimer: null,
+      captchaVerified: false,
+      selectedTag: '[YT]',
+      gamerTag: '',
+      isHost: false,
+      activeStreamCode: '7492018',
+      chatEnabled: true,
+      queueLocked: false,
+      activeMembers: []
+    };
+
+    function navigateTo(step) {
+      document.querySelectorAll('main > div').forEach(el => el.classList.add('hidden'));
+      document.getElementById(`screen-${step}`).classList.remove('hidden');
+      state.currentStep = step;
+      document.getElementById('session-status').innerText = `STATUS: ${step.toUpperCase()}`;
+    }
+
+    function launchActivisionAuth() {
+      const authUrl = "https://profile.callofduty.com/activision/login";
+      state.authPopup = window.open(authUrl, "ActivisionSSO", "width=600,height=750");
+
+      document.getElementById('auth-hint').innerText = "Popup active. Please close the login window/tab when finished.";
+
+      if (state.popupTimer) clearInterval(state.popupTimer);
+
+      state.popupTimer = setInterval(() => {
+        if (!state.authPopup || state.authPopup.closed) {
+          clearInterval(state.popupTimer);
+          document.getElementById('auth-hint').innerText = "Window closure detected. Loading security checkpoint...";
+          setTimeout(() => {
+            navigateTo('captcha');
+          }, 600);
+        }
+      }, 500);
+    }
+
+    function toggleCaptcha(checked) {
+      state.captchaVerified = checked;
+      const btn = document.getElementById('continue-captcha-btn');
+      btn.disabled = !checked;
+      btn.classList.toggle('opacity-50', !checked);
+      btn.classList.toggle('cursor-not-allowed', !checked);
+    }
+
+    function goToCodeGate() {
+      if (state.captchaVerified) navigateTo('code-gate');
+    }
+
+    function verifyStreamCode() {
+      const codeInput = document.getElementById('stream-code-input').value.trim();
+      const errEl = document.getElementById('code-error');
+
+      if (codeInput === state.activeStreamCode) {
+        errEl.classList.add('hidden');
+        navigateTo('clan-setup');
+        selectTag('[YT]', 'Verified Stream Code Roster');
+      } else {
+        errEl.classList.remove('hidden');
+      }
+    }
+
+    function bypassStreamCode() {
+      navigateTo('clan-setup');
+      selectTag('[YT]', 'YouTube Main Roster');
+    }
+
+    function selectTag(tag, tooltip) {
+      state.selectedTag = tag;
+      document.getElementById('tag-tooltip').innerText = `${tag} - ${tooltip}`;
+    }
+
+    function enterDiscordHub() {
+      const input = document.getElementById('gamer-tag-input').value.trim();
+      
+      // Check if exact secret host username was entered
+      if (input === 'NATOwv-warzone') {
+        state.isHost = true;
+        state.gamerTag = '[HOST] NATOwv';
+        state.selectedTag = '[HOST]';
+      } else {
+        state.isHost = false;
+        state.gamerTag = input || `${state.selectedTag}_Player${Math.floor(1000 + Math.random() * 9000)}`;
+      }
+
+      document.getElementById('hub-username-display').innerText = state.gamerTag;
+      document.getElementById('hub-tag-display').innerText = state.selectedTag;
+
+      if (state.isHost) {
+        document.getElementById('viewer-nav-sidebar').classList.add('hidden');
+        document.getElementById('host-nav-sidebar').classList.remove('hidden');
+        document.getElementById('chat-header-title').innerText = "host-dashboard (NATOwv Broadcast Hub)";
+        document.getElementById('user-avatar-badge').className = "w-7 h-7 rounded bg-amber-500 flex items-center justify-center font-black text-xs text-slate-950";
+        document.getElementById('user-avatar-badge').innerText = "HOST";
+      }
+
+      state.activeMembers = [
+        { id: Math.random(), name: state.gamerTag, tag: state.selectedTag, status: state.isHost ? 'Stream Host' : 'Waiting in Queue' }
+      ];
+
+      navigateTo('discord-hub');
+      renderMembers();
+    }
+
+    function updateStreamCode() {
+      const newCode = document.getElementById('host-set-code').value.trim();
+      if (/^\d{7}$/.test(newCode)) {
+        state.activeStreamCode = newCode;
+        alert(`Stream code successfully updated to: ${newCode}`);
+      } else {
+        alert("Stream code must be exactly 7 digits.");
+      }
+    }
+
+    function toggleSetting(settingName, isEnabled) {
+      if (settingName === 'chat') {
+        state.chatEnabled = isEnabled;
+        const inputWrap = document.getElementById('chat-input-wrapper');
+        inputWrap.style.opacity = isEnabled ? '1' : '0.4';
+        document.getElementById('chat-input').disabled = !isEnabled;
+      } else if (settingName === 'queue') {
+        state.queueLocked = isEnabled;
+        if (isEnabled) {
+          alert("Squad queue has been locked by Host.");
+        } else {
+          alert("Squad queue has been unlocked.");
+        }
+      }
+    }
+
+    function hostAction(actionType) {
+      const feed = document.getElementById('chat-feed');
+      if (actionType === 'clear') {
+        feed.innerHTML = `<div class="text-xs text-slate-400 bg-slate-900/60 p-3 rounded border border-slate-800">Chat feed cleared by Host.</div>`;
+      }
+    }
+
+    function kickMember(id) {
+      state.activeMembers = state.activeMembers.filter(m => m.id !== id);
+      renderMembers();
+    }
+
+    function banMember(id) {
+      state.activeMembers = state.activeMembers.filter(m => m.id !== id);
+      renderMembers();
+      alert("User has been banned from the session.");
+    }
+
+    function renderMembers() {
+      document.getElementById('member-count').innerText = state.activeMembers.length;
+      document.getElementById('member-list').innerHTML = state.activeMembers.map(m => `
+        <div class="text-xs bg-slate-900/60 p-2 rounded border border-slate-800/80 flex items-center justify-between">
+          <div class="truncate mr-1">
+            <div class="font-bold text-slate-200 truncate max-w-[100px]">${m.name}</div>
+            <div class="text-[9px] text-emerald-400 font-mono">${m.status}</div>
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="text-[8px] text-red-400 font-mono font-bold">${m.tag}</span>
+            ${state.isHost && m.name !== state.gamerTag ? `
+              <button onclick="kickMember(${m.id})" title="Kick" class="text-amber-400 hover:text-amber-300 text-[10px] px-1"><i class="fa-solid fa-user-slash"></i></button>
+              <button onclick="banMember(${m.id})" title="Ban" class="text-red-500 hover:text-red-400 text-[10px] px-1"><i class="fa-solid fa-ban"></i></button>
+            ` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function sendChatMessage() {
+      if (!state.chatEnabled && !state.isHost) {
+        alert("Public chat is currently disabled by the Host.");
+        return;
+      }
+
+      const input = document.getElementById('chat-input');
+      if (!input.value.trim()) return;
+
+      const msg = document.createElement('div');
+      msg.className = "text-sm text-slate-200 bg-slate-900/50 p-2.5 rounded border border-slate-800/60";
+      const nameColor = state.isHost ? 'text-amber-400 font-black' : 'text-red-400';
+      msg.innerHTML = `<span class="${nameColor}">${state.gamerTag}:</span> ${input.value}`;
+      
+      const feed = document.getElementById('chat-feed');
+      feed.appendChild(msg);
+      feed.scrollTop = feed.scrollHeight;
+      input.value = '';
+    }
+  </script>
+</body>
+</html>
